@@ -1,0 +1,101 @@
+---
+title: "Project 1"
+author: "Chaewon Jeong"
+date: "`r Sys.Date()`"
+output: word_document
+---
+
+```{r setup", include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(readxl)
+library(ggplot2)
+library(flextable)
+library(table1)
+```
+
+## R Import
+```{r import, message=FALSE}
+raw <- read_csv("MIDUS_combined_reduced.csv")
+# Sort patients that have both midus2 and midus3, and select variables that have aging component
+both <- raw |>
+  filter(MIDUS2 == 1, MIDUS3 == 1) |>
+  select(
+    M2ID, B1PAGE_M2, B1PRSEX, B4ZSITE, B4ZCOMPM, B4ZCOMPY,
+    C4H1A, C4H1B, C4H1C, C4H1F, C4H1G, C4H1I, C4H1J, C4H1K, C4H1N, C4H1O, C4H1P, C4H1R, C4H1T, C4H1V,
+    B4H1A, B4H1B, B4H1C, B4H1F, B4H1G, B4H1I, B4H1J, B4H1K, B4H1N, B4H1O, B4H1P, B4H1R, B4H1T, B4H1V
+  )
+
+for (i in 7:(ncol(both))) {
+  both[[i]] <- as.factor(both[[i]])
+}
+summary(both)
+```
+## R Make into binary
+
+For MIDUS2 (B4H1X)
+1: Yes
+2: No
+3: Borderline
+7: Don't know
+Yes = 1, 3
+No = 2
+NA = 7
+
+
+For MIDUS3 (C4H1X)
+1: Yes, diagnosed
+2: Yes, undiagnosed
+3: No
+4: Borderline, diagnosed
+5: Borderline, undiagnosed
+7: Don't know
+8: Missing
+9: Inappropriate
+
+Yes = 1, 2, 4, 5
+No = 3
+NA = 7, 8, 9
+
+```{r binary, message=FALSE}
+binary <- both
+collapse_midus3 <- c(
+  "C4H1A", "C4H1B", "C4H1C", "C4H1F", "C4H1G", "C4H1I", "C4H1J",
+  "C4H1K", "C4H1N", "C4H1O", "C4H1P", "C4H1R", "C4H1T", "C4H1V"
+)
+binary[collapse_midus3] <- lapply(binary[collapse_midus3], function(x) {
+  ifelse(x %in% c("1", "2", "4", "5"),1,ifelse(x == "3", 0, NA))
+})
+
+collapse_midus2 <- c(
+  "B4H1A", "B4H1B", "B4H1C", "B4H1F", "B4H1G", "B4H1I", "B4H1J",
+  "B4H1K", "B4H1N", "B4H1O", "B4H1P", "B4H1R", "B4H1T", "B4H1V"
+)
+binary[collapse_midus2] <- lapply(binary[collapse_midus2], function(x) {
+  ifelse(x %in% c("1", "3"), 1, ifelse(x == "2", 0, NA))
+})
+summary(binary)
+binary <- na.omit(binary)
+summary(binary)
+```
+
+## R calculate aging variable
+```{r calculate}
+aging <- binary
+aging <- aging |>
+  mutate(
+    aging_M3 = C4H1A + C4H1B + C4H1C + C4H1F + C4H1G + C4H1I + C4H1J + C4H1K + C4H1N + C4H1O + C4H1P + C4H1R + C4H1T + C4H1V,
+    aging_M2 = B4H1A + B4H1B + B4H1C + B4H1F + B4H1G + B4H1I + B4H1J + B4H1K + B4H1N + B4H1O + B4H1P + B4H1R + B4H1T + B4H1V
+  ) |> 
+  select(M2ID:B4ZCOMPY, aging_M3, aging_M2, C4H1A:C4H1V, B4H1A:B4H1V)
+  
+```
+
+## R plot
+```{r plot}
+ggplot(data = aging, aes(x = aging_M2, y = aging_M3)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0) +
+  theme_bw()
+```
+
