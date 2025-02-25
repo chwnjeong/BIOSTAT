@@ -1,5 +1,5 @@
 ---
-title: "Project 1"
+title: "Project 3"
 author: "Chaewon Jeong"
 date: "`r Sys.Date()`"
 output: word_document
@@ -12,6 +12,7 @@ library(readxl)
 library(ggplot2)
 library(flextable)
 library(table1)
+library(gtsummary)
 ```
 
 ## R Import
@@ -22,11 +23,12 @@ both <- raw |>
   filter(MIDUS2 == 1, MIDUS3 == 1) |>
   select(
     M2ID, B1PAGE_M2, B1PRSEX, B4ZSITE, B4ZCOMPM, B4ZCOMPY,
+    C1PRAGE, C1PRSEX, C4ZSITE, C4ZCOMPM, C4ZCOMPY,
     C4H1A, C4H1B, C4H1C, C4H1F, C4H1G, C4H1I, C4H1J, C4H1K, C4H1N, C4H1O, C4H1P, C4H1R, C4H1T, C4H1V,
     B4H1A, B4H1B, B4H1C, B4H1F, B4H1G, B4H1I, B4H1J, B4H1K, B4H1N, B4H1O, B4H1P, B4H1R, B4H1T, B4H1V
   )
 
-for (i in 7:(ncol(both))) {
+for (i in 12:(ncol(both))) {
   both[[i]] <- as.factor(both[[i]])
 }
 summary(both)
@@ -87,7 +89,7 @@ aging <- aging |>
     aging_M3 = C4H1A + C4H1B + C4H1C + C4H1F + C4H1G + C4H1I + C4H1J + C4H1K + C4H1N + C4H1O + C4H1P + C4H1R + C4H1T + C4H1V,
     aging_M2 = B4H1A + B4H1B + B4H1C + B4H1F + B4H1G + B4H1I + B4H1J + B4H1K + B4H1N + B4H1O + B4H1P + B4H1R + B4H1T + B4H1V
   ) |> 
-  select(M2ID:B4ZCOMPY, aging_M3, aging_M2, C4H1A:C4H1V, B4H1A:B4H1V)
+  select(M2ID:C4ZCOMPY, aging_M3, aging_M2, C4H1A:C4H1V, B4H1A:B4H1V)
   
 ```
 
@@ -97,5 +99,63 @@ ggplot(data = aging, aes(x = aging_M2, y = aging_M3)) +
   geom_point() +
   geom_abline(slope = 1, intercept = 0) +
   theme_bw()
+
+aging_hist <- aging |> 
+  select(M2ID, aging_M2, aging_M3) |> 
+  pivot_longer(cols = c(aging_M2, aging_M3), names_to = "variable", values_to = "value")
+
+ggplot(data = aging_hist, aes(x = value, fill = variable)) +
+  geom_histogram(position = "identity", binwidth = 1, alpha = 0.5, color = "black") +
+  labs(x = "Value", y = "Count", title = "Comparison of Aging_M2 and Aging_M3") +
+  theme_bw()
+```
+
+## R descriptive analysis
+```{r descriptive analysis}
+aging |>
+  tbl_summary(
+    include = c(aging_M3, aging_M2),
+    # by = year,
+    type = list(
+      aging_M3 ~ "continuous2",
+      aging_M2 ~ "continuous2"
+    ),
+    statistic = list(
+      aging_M3 ~ c("{mean} ({sd})", "{median} [{p25}, {p75}]"),
+      aging_M2 ~ c("{mean} ({sd})", "{median} [{p25}, {p75}]")
+    ),
+    label = list(
+      aging_M3 ~ "Aging Calculated from MIDUSM3",
+      aging_M2 ~ "Aging Calculated from MIDUSM2"
+    )
+  ) |>
+  as_flex_table()
+```
+
+## R primary analysis
+```{r primary analysis}
+aging_M2 <- aging |> 
+  select(M2ID, B1PAGE_M2, aging_M2) |> 
+  rename(age = B1PAGE_M2,
+         aging = aging_M2)
+
+aging_M3 <- aging |> 
+  select(M2ID, C1PRAGE, aging_M3) |> 
+  rename(age = C1PRAGE,
+         aging = aging_M3)
+
+aging_long <- rbind(aging_M2, aging_M3)
+
+
+
+model <- lm(aging ~ age + M2/M3 +, data = aging_long)
+summary(model)
+
+# 
+
+cor(aging_long$age, aging_long$aging)
+cor(aging$B1PAGE_M2, aging$aging_M2)
+cor(aging$C1PRAGE, aging$aging_M3)
+
 ```
 
